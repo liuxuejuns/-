@@ -1,0 +1,146 @@
+version: '3'
+
+services:
+  filepre-postgres:
+    container_name: filepre-postgres
+    # image: postgres:12
+    image: reg.swharbor.com/filepreview/filepre-postgres:12
+    privileged: true
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: 'root'
+      POSTGRES_USER: postgres
+      POSTGRES_DB: filepre_db
+    expose:
+      - "12310"
+    ports:
+      - 12310:5432
+    volumes:
+      - ./:/filepreview/docker
+      - filepredata:/var/lib/postgresql/data/
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.2
+
+  filepre-postgres-backup:
+    container_name: filepre-postgres-backup
+    # image: postgres:12
+    image: reg.swharbor.com/filepreview/filepre-postgres:12
+    privileged: true
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: 'root'
+      POSTGRES_USER: postgres
+      POSTGRES_DB: filepre_db
+    expose:
+      - "12311"
+    ports:
+      - 12311:5432
+    volumes:
+      - ./:/filepreview/docker
+      - filepredatabackup:/var/lib/postgresql/data/
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.3
+
+  filepre-libreoffice:
+    container_name: filepre-libreoffice
+    # image: libreoffice:v1
+    image: reg.swharbor.com/filepreview/filepre-libreoffice:v1
+    privileged: true
+    tty: true
+    restart: always
+    volumes:
+      - ../static:/home/static
+    depends_on:
+      - filepre-web
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.4
+
+  filepre-nginx:
+    container_name: filepre-nginx
+    # image: nginx
+    image: reg.swharbor.com/filepreview/filepre-nginx:latest
+    privileged: true
+    restart: always
+    ports:
+      - 8500:8500
+    volumes:
+      - ../static:/usr/share/nginx/html/static
+      - ./nginx.conf:/etc/nginx/conf.d/filepre_nginx.conf
+      - ../logs/nginx:/var/log/nginx
+    command: [ nginx, '-g', 'daemon off;' ]
+    depends_on:
+      - filepre-web
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.5
+
+  filepre-web:
+    container_name: filepre-web
+    # build: ./
+    # image: filepre-web:latest
+    image: reg.swharbor.com/filepreview/filepre-web:v1
+    privileged: true
+    restart: always
+    ports:
+      - 12000:12000
+    working_dir: /filepreview
+    # tty: true
+    command: bash start.sh
+    volumes:
+      - /usr/bin/docker:/usr/bin/docker 
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../:/filepreview
+      - ./:/filepreview/docker
+      - ../logs/django:/filepreview/logs/django
+      - ../logs/uwsgi:/filepreview/logs/uwsgi
+    depends_on:
+      # - filepre-postgres
+      - filepre-redis
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.6
+
+  filepre-redis:
+    container_name: filepre-redis
+    # image: redis:latest
+    image: reg.swharbor.com/filepreview/filepre-redis:latest
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.7
+
+  filepre-celery:
+    container_name: filepre-celery
+    # build: ./
+    image: reg.swharbor.com/filepreview/filepre-web:v1
+    # tty: true
+    working_dir: /filepreview
+    command: ["celery", "-A", "filepreview", "worker", "--loglevel=info"]
+    volumes:
+      - /usr/bin/docker:/usr/bin/docker 
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../:/filepreview
+    depends_on:
+      - filepre-redis
+      - filepre-web
+    networks:
+      filepreweb:
+        ipv4_address: 172.66.0.8
+
+volumes:
+  filepredata:
+  filepredatabackup:
+
+networks:
+  filepreweb:
+    ipam:
+        driver: default
+        config:
+          - subnet: "172.66.0.0/24"
+            # gateway: 172.66.0.1

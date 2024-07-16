@@ -1,0 +1,24 @@
+1.使用分片接收视频上传
+2.PPT要用到异步转换（前端）
+3.定时删除test下的文件
+4.修改文件的接口注意修改
+5.调用前端地址获取byse64数据的ID
+
+logger.error('https://so.csdn.net/so/search?q=' + str(e))
+
+把分享时的用户名改成：
+        users = request.user
+        user_name = os.path.join('media', upload_folder,users.user_name)
+
+
+1、提交分享的时候做事务 v
+2、秒传 v
+3、续传 V
+4、MP4做外键  v
+5、文件表中添加状态字段：true or false  v
+
+
+时间戳加文件名
+
+　
+ 
